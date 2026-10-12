@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:,">
+<title>Controle Universal</title>
+<style>
+  :root { --bg:#0f1115; --card:#1a1d24; --btn:#262a33; --btn2:#343a49; --fg:#e8eaf0; --mut:#8b92a5; --acc:#4f8cff; --red:#ff4d5e; --ok:#35c46a; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; background:var(--bg); color:var(--fg); font:16px system-ui,-apple-system,sans-serif; }
+  body { display:flex; justify-content:center; padding-bottom:env(safe-area-inset-bottom); }
+  main { width:100%; max-width:430px; padding:12px 14px 40px; }
+  header { display:flex; gap:8px; align-items:center; margin-bottom:10px; }
+  select, input, textarea { background:var(--card); color:var(--fg); border:1px solid var(--btn2); border-radius:12px; padding:11px; font-size:16px; width:100%; font-family:inherit; }
+  button { background:var(--btn); color:var(--fg); border:0; border-radius:14px; font-size:18px; height:54px; cursor:pointer; touch-action:manipulation; user-select:none; font-family:inherit; }
+  button:active { background:var(--btn2); transform:scale(.96); }
+  button.acc { background:var(--acc); } button.red { background:var(--red); } button.ok { background:var(--ok); color:#06210f; }
+  button.small { font-size:14px; height:42px; padding:0 12px; }
+  button.icon { width:48px; flex:none; height:44px; font-size:18px; }
+  .tabs { display:flex; background:var(--card); border-radius:14px; padding:4px; margin-bottom:14px; gap:4px; }
+  .tabs button { flex:1; height:40px; font-size:14px; background:transparent; border-radius:10px; }
+  .tabs button.on { background:var(--acc); }
+  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:12px; }
+  .dpad { grid-template-rows:repeat(3,62px); }
+  .dpad button { height:100%; } .dpad .center { background:var(--acc); font-weight:700; }
+  .pair2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+  .col { display:grid; gap:8px; } .lbl { text-align:center; color:var(--mut); font-size:12px; }
+  .num { grid-template-columns:repeat(3,1fr); }
+  .num button { height:48px; font-size:18px; }
+  .hint { color:var(--mut); font-size:13px; line-height:1.4; }
+  .apps { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin:10px 0; }
+  .apps button { height:62px; font-size:15px; padding:6px; overflow:hidden; text-overflow:ellipsis; }
+  .apps button.pop { background:#2b3350; }
+  #toast { position:fixed; bottom:calc(20px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); background:#000d; padding:10px 16px; border-radius:20px; max-width:92%; opacity:0; transition:.2s; pointer-events:none; text-align:center; font-size:14px; z-index:99; }
+  #toast.show { opacity:1; } #toast.bad { background:#b3202f; }
+  dialog { background:var(--card); color:var(--fg); border:0; border-radius:18px; width:94%; max-width:410px; padding:16px; max-height:92vh; }
+  dialog::backdrop { background:#000b; }
+  dialog h3 { margin:0 0 8px; }
+  label { display:block; margin:10px 0 4px; color:var(--mut); font-size:13px; }
+  .row { display:flex; gap:8px; align-items:center; }
+  .found, .tv { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid var(--btn2); }
+  .tv { flex-direction:column; align-items:stretch; }
+  .tv .btns { display:flex; flex-wrap:wrap; gap:6px; }
+  .tv .btns button { height:36px; font-size:13px; padding:0 10px; }
+  pre { background:#0b0d11; border-radius:10px; padding:10px; font-size:11px; white-space:pre-wrap; max-height:200px; overflow:auto; margin:6px 0; }
+  hr { border:0; border-top:1px solid var(--btn2); margin:14px 0; }
+  .empty { text-align:center; margin:50px 0 20px; }
+  .empty h2 { margin:0 0 8px; }
+  .hide { display:none !important; }
+  textarea { min-height:90px; resize:vertical; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <select id="dev" class="hide"></select>
+    <button class="icon" id="btnAdd" title="Adicionar TV">＋</button>
+    <button class="icon" id="btnManage" title="Gerenciar">⚙</button>
+  </header>
+
+  <section id="empty" class="empty hide">
+    <h2>Vamos começar</h2>
+    <p class="hint">O celular e a TV precisam estar no mesmo Wi-Fi.<br>TV antiga (sem Wi-Fi)? Use um emissor infravermelho — veja o botão ＋.</p>
+    <button class="acc" style="width:100%" id="btnStart">🔍 Procurar minha TV</button>
+  </section>
+
+  <div id="app" class="hide">
+    <nav class="tabs">
+      <button data-tab="remote" class="on">Controle</button>
+      <button data-tab="apps">Apps</button>
+      <button data-tab="kbd">Teclado</button>
+    </nav>
+
+    <section id="tab-remote">
+      <div class="grid">
+        <button class="red" data-k="power">⏻</button>
+        <button data-k="source">Fonte</button>
+        <button data-k="mute">🔇</button>
+      </div>
+      <div class="grid dpad">
+        <button data-k="home">⌂</button><button data-k="up">▲</button><button data-k="back">↩</button>
+        <button data-k="left">◀</button><button class="center" data-k="ok">OK</button><button data-k="right">▶</button>
+        <button data-k="menu">☰</button><button data-k="down">▼</button><button data-k="info">ⓘ</button>
+      </div>
+      <div class="pair2">
+        <div class="col"><button data-k="vol_up" data-rep>＋</button><div class="lbl">VOLUME</div><button data-k="vol_down" data-rep>－</button></div>
+        <div class="col"><button data-k="ch_up" data-rep>▲</button><div class="lbl">CANAL</div><button data-k="ch_down" data-rep>▼</button></div>
+      </div>
+      <div class="grid">
+        <button class="small" data-k="rewind">⏪</button><button class="small" data-k="play">▶</button><button class="small" data-k="forward">⏩</button>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <button class="small" data-k="pause">⏸ Pausar</button><button class="small" data-k="exit">✕ Sair</button>
+      </div>
+      <button class="small" id="toggleNum" style="width:100%;margin-bottom:10px">123 Números</button>
+      <div id="numpad" class="grid num hide">
+        <button data-k="num_1">1</button><button data-k="num_2">2</button><button data-k="num_3">3</button>
+        <button data-k="num_4">4</button><button data-k="num_5">5</button><button data-k="num_6">6</button>
+        <button data-k="num_7">7</button><button data-k="num_8">8</button><button data-k="num_9">9</button>
+        <span></span><button data-k="num_0">0</button><span></span>
+      </div>
+    </section>
+
+    <section id="tab-apps" class="hide">
+      <div class="row"><button class="small acc" id="btnLoadApps" style="flex:1">↻ Carregar apps da TV</button></div>
+      <div id="appGrid" class="apps"></div>
+      <p class="hint" id="appsHint"></p>
+      <label>Abrir app por link ou pacote (Android TV)</label>
+      <div class="row"><input id="customApp" placeholder="https://www.youtube.com  ou  com.globo.globoplay"><button class="small acc" id="btnCustomApp">Abrir</button></div>
+    </section>
+
+    <section id="tab-kbd" class="hide">
+      <p class="hint">Na TV, abra a busca ou o campo de texto (o teclado da TV deve aparecer). Depois digite aqui.</p>
+      <label><input type="checkbox" id="live" checked style="width:auto"> Digitar ao vivo (cada letra vai direto para a TV)</label>
+      <textarea id="kbdText" placeholder="Digite aqui…" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+      <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:10px">
+        <button class="small" id="kbdBack">⌫ Apagar</button>
+        <button class="small acc" id="kbdSend">Enviar</button>
+        <button class="small ok" id="kbdEnter">⏎ Buscar</button>
+      </div>
+      <p class="hint">Dica: TVs por infravermelho não aceitam texto. Samsung, LG, Roku, Android TV e Sony aceitam.</p>
+    </section>
+  </div>
+</main>
+
+<!-- Adicionar -->
+<dialog id="dlgAdd">
+  <h3>Adicionar TV</h3>
+  <button class="acc" id="btnScan" style="width:100%;height:46px">🔍 Procurar na rede</button>
+  <div id="found"></div>
+  <hr>
+  <label>Nome</label><input id="fName" placeholder="TV da sala">
+  <label>Tipo / marca</label>
+  <select id="fType"></select>
+  <p class="hint" id="typeHelp"></p>
+  <label>IP da TV (ou do emissor IR)</label><input id="fHost" placeholder="192.168.0.50" inputmode="decimal">
+  <div id="xSony" class="hide"><label>PSK da Sony</label><input id="fPsk" placeholder="0000"></div>
+  <div id="xIr" class="hide"><label>Marca da TV (códigos prontos)</label><select id="fPreset"></select></div>
+  <label>MAC da TV (opcional — ajuda a ligar a TV pela rede)</label><input id="fMac" placeholder="AA:BB:CC:DD:EE:FF">
+  <div class="row" style="margin-top:14px">
+    <button class="small" id="btnCancel" style="flex:1">Cancelar</button>
+    <button class="small acc" id="btnSave" style="flex:1">Salvar</button>
+  </div>
+</dialog>
+
+<!-- Gerenciar -->
+<dialog id="dlgManage">
+  <h3>Gerenciar conexões</h3>
+  <div id="tvList"></div>
+  <div class="row" style="margin-top:10px">
+    <button class="small" id="mAdd" style="flex:1">＋ Adicionar TV</button>
+    <button class="small" id="mClose" style="flex:1">Fechar</button>
+  </div>
+  <hr>
+  <div id="learnBox" class="hide">
+    <h3 style="font-size:16px">Aprender tecla (IR Broadlink)</h3>
+    <p class="hint">Aperte "Aprender", e em até 25 s aponte o controle original para o Broadlink e aperte a tecla.</p>
+    <div class="row"><select id="learnKey"></select><button class="small acc" id="btnLearn">Aprender</button></div>
+    <hr>
+  </div>
+  <details><summary class="hint">Diagnóstico (para achar o problema)</summary>
+    <pre id="logBox">…</pre>
+    <button class="small" id="btnLog" style="width:100%">Atualizar</button>
+  </details>
+  <hr>
+  <button class="small red" id="btnWipe" style="width:100%">🗑 Apagar tudo e recomeçar do zero</button>
+</dialog>
+
+<!-- Editar -->
+<dialog id="dlgEdit">
+  <h3>Editar TV</h3>
+  <label>Nome</label><input id="eName">
+  <label>IP (mudou? atualize aqui)</label><input id="eHost" inputmode="decimal">
+  <label>MAC (opcional)</label><input id="eMac">
+  <div id="eSony" class="hide"><label>PSK da Sony</label><input id="ePsk"></div>
+  <div id="eIr" class="hide"><label>Marca da TV (IR)</label><select id="ePreset"></select></div>
+  <div class="row" style="margin-top:14px">
+    <button class="small" id="eCancel" style="flex:1">Cancelar</button>
+    <button class="small acc" id="eSave" style="flex:1">Salvar</button>
+  </div>
+</dialog>
+
+<!-- Parear Android TV -->
+<dialog id="dlgPair">
+  <h3>Parear Android TV / Google TV</h3>
+  <p class="hint">1) Ligue a TV. 2) Toque em "Mostrar código". 3) Digite o código exibido na TV.</p>
+  <button class="acc" id="btnPairStart" style="width:100%;height:46px">Mostrar código na TV</button>
+  <label>Código da TV</label>
+  <input id="pairCode" placeholder="ABC123" autocapitalize="characters" autocomplete="off">
+  <div class="row" style="margin-top:14px">
+    <button class="small" id="pairClose" style="flex:1">Fechar</button>
+    <button class="small ok" id="pairOk" style="flex:1">Confirmar</button>
+  </div>
+</dialog>
+
+<div id="toast"></div>
+<script>
+const $ = s => document.querySelector(s);
+let devices = [], meta = { types:{}, presets:{}, needs_pairing:[], keys:[] };
+let q = Promise.resolve();   // fila para manter ordem dos comandos
+
+const TYPE_HELP = {
+  samsung: 'Smart TV Samsung (2016 ou mais nova). Aceite "Permitir" na tela da TV na 1ª vez.',
+  lg: 'Smart TV LG webOS. Ligue "LG Connect Apps" na TV e aceite o pedido na 1ª vez.',
+  roku: 'Roku, ou TV com Roku (TCL, Hisense, Philips...). Ative o controle por apps móveis.',
+  androidtv: 'Android TV / Google TV (Sony, Philips, TCL, Xiaomi, Mi Box...). Depois de salvar, faça o pareamento.',
+  sony: 'Sony Bravia: ative Controle IP + Pre-Shared Key na TV e informe a chave abaixo.',
+  ir: 'TV antiga: um ESP8266/ESP32 com Tasmota + LED infravermelho. Informe o IP do ESP.',
+  broadlink: 'TV antiga: emissor Broadlink RM (mini/pro). Funciona com qualquer marca (aprende o controle).',
+};
+
+function toast(msg, bad) {
+  const t = $('#toast'); t.textContent = msg; t.className = 'show' + (bad ? ' bad' : '');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.className = '', bad ? 6000 : 1500);
+}
+async function api(path, method = 'GET', body) {
+  let r;
+  try { r = await fetch(path, { method, headers:{'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : undefined }); }
+  catch (e) { throw new Error('Sem conexão com o servidor. O programa (python app.py) está rodando?'); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.ok === false) throw new Error(j.error || ('Erro ' + r.status));
+  return j;
+}
+const guard = fn => async (...a) => { try { return await fn(...a); } catch (e) { toast(e.message, true); } };
+const cur = () => devices.find(d => d.id === $('#dev').value);
+
+async function refresh(selectId) {
+  devices = await api('/api/devices');
+  $('#dev').innerHTML = devices.map(d => `<option value="${d.id}">${esc(d.name)} · ${esc(meta.types[d.type] || d.type)}</option>`).join('');
+  const last = selectId || localStorage.getItem('dev');
+  if (last && devices.some(d => d.id === last)) $('#dev').value = last;
+  const has = devices.length > 0;
+  $('#dev').classList.toggle('hide', !has);
+  $('#app').classList.toggle('hide', !has);
+  $('#empty').classList.toggle('hide', has);
+  localStorage.setItem('dev', has ? $('#dev').value : '');
+  $('#appGrid').innerHTML = '';
+}
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+$('#dev').onchange = () => { localStorage.setItem('dev', $('#dev').value); $('#appGrid').innerHTML = ''; };
+
+// ---------- abas
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+  ['remote','apps','kbd'].forEach(t => $('#tab-' + t).classList.toggle('hide', t !== b.dataset.tab));
+  if (b.dataset.tab === 'apps' && !$('#appGrid').children.length) loadApps();
+});
+
+// ---------- teclas
+const press = guard(async k => {
+  const d = cur(); if (!d) return;
+  if (navigator.vibrate) navigator.vibrate(12);
+  await api(`/api/devices/${d.id}/key/${k}`, 'POST');
+});
+document.querySelectorAll('[data-k]').forEach(b => {
+  const k = b.dataset.k; let hold = null, fired = false;
+  b.addEventListener('click', () => { if (fired) { fired = false; return; } press(k); });
+  if (b.hasAttribute('data-rep')) {
+    b.addEventListener('pointerdown', () => {
+      fired = false;
+      hold = setTimeout(() => { fired = true; hold = setInterval(() => press(k), 260); }, 450);
+    });
+    ['pointerup','pointerleave','pointercancel'].forEach(ev => b.addEventListener(ev, () => { clearTimeout(hold); clearInterval(hold); }));
+  }
+});
+$('#toggleNum').onclick = () => $('#numpad').classList.toggle('hide');
+
+// ---------- apps
+const POP = ['netflix','youtube','prime','disney','max','globo','spotify','apple'];
+const loadApps = guard(async () => {
+  const d = cur(); if (!d) return;
+  $('#appGrid').innerHTML = '<p class="hint">Carregando…</p>'; $('#appsHint').textContent = '';
+  let r;
+  try { r = await api(`/api/devices/${d.id}/apps`); }
+  catch (e) { $('#appGrid').innerHTML = ''; $('#appsHint').textContent = e.message; throw e; }
+  const list = r.apps.filter(a => a.id && a.name);
+  list.sort((a, b) => (isPop(b) - isPop(a)) || a.name.localeCompare(b.name));
+  $('#appGrid').innerHTML = '';
+  list.forEach(a => {
+    const el = document.createElement('button'); el.textContent = a.name; if (isPop(a)) el.className = 'pop';
+    el.onclick = guard(async () => { await api(`/api/devices/${d.id}/launch`, 'POST', { id: a.id }); toast('Abrindo ' + a.name + '…'); });
+    $('#appGrid').appendChild(el);
+  });
+  if (!list.length) $('#appsHint').textContent = 'Esta TV não informou apps. Use o botão Home e as setas.';
+});
+const isPop = a => POP.some(p => (a.name + ' ' + a.id).toLowerCase().includes(p)) ? 1 : 0;
+$('#btnLoadApps').onclick = loadApps;
+$('#btnCustomApp').onclick = guard(async () => {
+  const v = $('#customApp').value.trim(); if (!v) return;
+  await api(`/api/devices/${cur().id}/launch`, 'POST', { id: v }); toast('Enviado');
+});
+
+// ---------- teclado
+let sent = '';
+const kbd = $('#kbdText');
+const text = (body) => { q = q.then(() => api(`/api/devices/${cur().id}/text`, 'POST', body)).catch(e => toast(e.message, true)); return q; };
+kbd.addEventListener('input', () => {
+  if (!$('#live').checked) return;
+  const now = kbd.value;
+  if (now.startsWith(sent)) { const delta = now.slice(sent.length); if (delta) text({ action:'type', delta, full: now }); }
+  else if (sent.startsWith(now)) text({ action:'erase', n: sent.length - now.length, full: now });
+  else { text({ action:'erase', n: sent.length, full: '' }); text({ action:'type', delta: now, full: now }); }
+  sent = now;
+});
+$('#kbdSend').onclick = () => { if ($('#live').checked) return toast('Já está enviando ao vivo'); const v = kbd.value; if (v) { text({ action:'type', delta: v, full: v }); sent = v; } };
+$('#kbdBack').onclick = () => { if (kbd.value) { kbd.value = kbd.value.slice(0, -1); } text({ action:'erase', n: 1, full: kbd.value }); sent = kbd.value; };
+$('#kbdEnter').onclick = () => text({ action:'enter' });
+$('#live').onchange = () => { sent = $('#live').checked ? kbd.value : sent; };
+
+// ---------- adicionar
+function toggleExtras(prefix, t) {
+  $(prefix + 'Sony').classList.toggle('hide', t !== 'sony');
+  $(prefix + 'Ir').classList.toggle('hide', t !== 'ir' && t !== 'broadlink');
+}
+$('#fType').onchange = () => { const t = $('#fType').value; $('#typeHelp').textContent = TYPE_HELP[t] || ''; toggleExtras('#x', t); };
+function openAdd() { $('#found').innerHTML = ''; $('#fType').onchange(); $('#dlgManage').close(); $('#dlgAdd').showModal(); }
+$('#btnAdd').onclick = openAdd; $('#mAdd').onclick = openAdd;
+$('#btnStart').onclick = () => { openAdd(); $('#btnScan').click(); };
+$('#btnCancel').onclick = () => $('#dlgAdd').close();
+$('#btnScan').onclick = async () => {
+  const box = $('#found'); box.innerHTML = '<p class="hint">Procurando… (~10 s)</p>';
+  try {
+    const list = await api('/api/scan');
+    box.innerHTML = list.length ? '<p class="hint">Encontrado:</p>' : '<p class="hint">Nada encontrado. Confira o Wi-Fi ou preencha o IP manualmente (Configurações da TV > Rede).</p>';
+    list.forEach(f => {
+      const row = document.createElement('div'); row.className = 'found';
+      row.innerHTML = `<span>${esc(f.name || f.type)}<br><span class="hint">${esc(meta.types[f.type] || f.type)} · ${esc(f.host)}${f.note ? '<br>' + esc(f.note) : ''}</span></span><button class="small acc">Usar</button>`;
+      row.querySelector('button').onclick = () => { $('#fType').value = f.type; $('#fHost').value = f.host; if (!$('#fName').value) $('#fName').value = f.name || ''; $('#fType').onchange(); toast('Preenchido. Toque em Salvar.'); };
+      box.appendChild(row);
+    });
+  } catch (e) { box.innerHTML = ''; toast(e.message, true); }
+};
+$('#btnSave').onclick = guard(async () => {
+  const type = $('#fType').value;
+  const d = await api('/api/devices', 'POST', { name: $('#fName').value, type, host: $('#fHost').value,
+    mac: $('#fMac').value, psk: $('#fPsk').value, ir_preset: $('#fPreset').value });
+  $('#dlgAdd').close(); await refresh(d.id);
+  if (meta.needs_pairing.includes(type)) { $('#dlgPair').showModal(); return; }
+  toast('Salvo. Testando… se a TV pedir, aceite na tela dela.');
+  testDevice(d.id);
+});
+
+// ---------- gerenciar
+async function renderManage() {
+  const box = $('#tvList'); box.innerHTML = devices.length ? '' : '<p class="hint">Nenhuma TV cadastrada.</p>';
+  devices.forEach(d => {
+    const el = document.createElement('div'); el.className = 'tv';
+    el.innerHTML = `<div><b>${esc(d.name)}</b><br><span class="hint">${esc(meta.types[d.type] || d.type)} · ${esc(d.host)}</span></div>
+      <div class="btns"><button data-a="test">Testar</button>${meta.needs_pairing.includes(d.type) ? '<button data-a="pair">Parear</button>' : ''}<button data-a="edit">Editar IP</button><button data-a="reset">Resetar conexão</button><button data-a="del" class="red">Remover</button></div>`;
+    el.querySelectorAll('button').forEach(b => b.onclick = guard(() => manageAct(b.dataset.a, d)));
+    box.appendChild(el);
+  });
+  $('#learnBox').classList.toggle('hide', !devices.some(d => d.type === 'broadlink'));
+}
+async function testDevice(id) {
+  toast('Testando… (se a TV pedir, aceite na tela dela)');
+  try { const r = await api(`/api/devices/${id}/test`, 'POST'); toast('✔ Conectado: ' + (r.result.name || '') + ' ' + (r.result.info || '')); }
+  catch (e) { toast(e.message, true); }
+}
+async function manageAct(a, d) {
+  if (a === 'test') return testDevice(d.id);
+  if (a === 'pair') { $('#dev').value = d.id; $('#dlgManage').close(); return $('#dlgPair').showModal(); }
+  if (a === 'edit') {
+    $('#eName').value = d.name; $('#eHost').value = d.host; $('#eMac').value = d.mac || ''; $('#ePsk').value = d.psk || '';
+    $('#ePreset').value = d.ir_preset || 'lg'; toggleExtras('#e', d.type); $('#eSave').dataset.id = d.id;
+    $('#dlgManage').close(); return $('#dlgEdit').showModal();
+  }
+  if (a === 'reset') {
+    if (!confirm(`Esquecer o pareamento de "${d.name}"? Você precisará aceitar/parear de novo.`)) return;
+    await api(`/api/devices/${d.id}/reset`, 'POST'); toast('Conexão apagada. Toque em Testar para refazer.');
+  }
+  if (a === 'del') {
+    if (!confirm(`Remover "${d.name}"?`)) return;
+    await api(`/api/devices/${d.id}`, 'DELETE'); await refresh(); await renderManage();
+  }
+}
+$('#btnManage').onclick = async () => {
+  await renderManage();
+  const sel = $('#learnKey'); if (!sel.children.length) sel.innerHTML = meta.keys.map(k => `<option>${k}</option>`).join('');
+  $('#dlgManage').showModal();
+};
+$('#mClose').onclick = () => $('#dlgManage').close();
+$('#eCancel').onclick = () => $('#dlgEdit').close();
+$('#eSave').onclick = guard(async () => {
+  await api(`/api/devices/${$('#eSave').dataset.id}`, 'PATCH', { name: $('#eName').value, host: $('#eHost').value, mac: $('#eMac').value, psk: $('#ePsk').value, ir_preset: $('#ePreset').value });
+  $('#dlgEdit').close(); await refresh($('#eSave').dataset.id); toast('Salvo');
+});
+$('#btnWipe').onclick = guard(async () => {
+  if (!confirm('Apagar TODAS as TVs, pareamentos e códigos? Não dá para desfazer.')) return;
+  await api('/api/reset_all', 'POST'); await refresh(); $('#dlgManage').close(); toast('Tudo apagado. Comece de novo com ＋');
+});
+$('#btnLog').onclick = guard(async () => { const l = await api('/api/log'); $('#logBox').textContent = l.length ? l.slice().reverse().join('\n') : '(sem registros)'; });
+$('#btnLearn').onclick = guard(async () => {
+  const d = devices.find(x => x.type === 'broadlink'); const k = $('#learnKey').value;
+  toast('Aponte o controle original e aperte a tecla "' + k + '"…');
+  await api(`/api/devices/${d.id}/learn/${k}`, 'POST'); toast('✔ Tecla "' + k + '" aprendida'); await refresh(d.id);
+});
+
+// ---------- pareamento
+$('#pairClose').onclick = () => $('#dlgPair').close();
+$('#btnPairStart').onclick = guard(async () => { await api(`/api/devices/${cur().id}/pair/start`, 'POST'); toast('Veja o código na tela da TV'); });
+$('#pairOk').onclick = guard(async () => {
+  await api(`/api/devices/${cur().id}/pair/finish`, 'POST', { code: $('#pairCode').value });
+  $('#dlgPair').close(); $('#pairCode').value = ''; toast('✔ Pareado! Já pode usar.');
+});
+
+// ---------- início
+(async () => {
+  try { meta = await api('/api/types'); } catch (e) { toast(e.message, true); }
+  $('#fType').innerHTML = Object.entries(meta.types).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
+  const presets = Object.entries(meta.presets).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
+  $('#fPreset').innerHTML = presets; $('#ePreset').innerHTML = presets;
+  try { await refresh(); } catch (e) { toast(e.message, true); }
+})();
+</script>
+</body>
+</html>
